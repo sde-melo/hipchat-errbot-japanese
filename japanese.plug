@@ -1,0 +1,13 @@
+[Core]
+name = japanese
+module = japanese
+
+[Documentation]
+description = Tell when is (finally!) the next Japanese
+
+[Python]
+version = 3
+
+[Errbot]
+min = 4.3.7
+

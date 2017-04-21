@@ -3,9 +3,15 @@
 import collections
 import datetime
 import itertools
-import workalendar.core as cal
 from errbot import BotPlugin, botcmd, arg_botcmd, utils
-from workalendar.europe import France
+try:
+    import workalendar.core as cal
+    from workalendar.europe import France
+    CALENDAR = France()
+except ImportError:
+    import calendar
+    cal = None
+    CALENDAR = None
 
 
 class Japanese(BotPlugin):
@@ -13,19 +19,18 @@ class Japanese(BotPlugin):
     Tell when is (finally!) the next Japanese
     """
 
-    CALENDAR = France()
     CONFIG_TEMPLATE = {
-        'WEEKDAY': 'FRI',
+        'WEEKDAY': 'FRIDAY',
         'TIME': '12:00'
     }
     FRENCH_DAYS = collections.OrderedDict((
-        ('LUN', 'MON'),
-        ('MAR', 'TUE'),
-        ('MER', 'WED'),
-        ('JEU', 'THU'),
-        ('VEN', 'FRI'),
-        ('SAM', 'SAT'),
-        ('DIM', 'SUN'),
+        ('LUNDI', 'MONDAY'),
+        ('MARDI', 'TUESDAY'),
+        ('MERCREDI', 'WEDNESDAY'),
+        ('JEUDI', 'THURSDAY'),
+        ('VENDREDI', 'FRIDAY'),
+        ('SAMEDI', 'SATURDAY'),
+        ('DIMANCHE', 'SUNDAY'),
     ))
 
     def get_configuration_template(self):
@@ -33,7 +38,8 @@ class Japanese(BotPlugin):
 
     def check_weekday(self, weekday):
         valid_weekdays = list(self.FRENCH_DAYS.values()) + list(self.FRENCH_DAYS.keys())
-        if weekday[:3] not in valid_weekdays:
+        weekday = weekday[:3].upper()
+        if weekday not in valid_weekdays:
             raise ValueError('"{}" is an invalid weekday. It should be amongst {}.'.format(weekday, ', '.join(valid_weekdays)))
 
     def check_time(self, time_):
@@ -75,14 +81,22 @@ class Japanese(BotPlugin):
     
     @classmethod
     def find_following_working_weekday(cls, day, weekday):
-        d = cls.CALENDAR.get_first_weekday_after(day, weekday)
-        while cls.CALENDAR.is_holiday(d):
-            d += datetime.timedelta(days=7)
+        if CALENDAR:
+            d = CALENDAR.get_first_weekday_after(day, weekday)
+            while CALENDAR.is_holiday(d):
+                d += datetime.timedelta(days=7)
+        else:
+            # Holidays are not available, just return the following business day
+            d = day + datetime.timedelta(days=(weekday - day.weekday()) % 7)
         return d
 
     def get_weekday(self):
-        weekday = self.config['WEEKDAY'][:3]
-        weekday = getattr(cal, self.FRENCH_DAYS.get(weekday, weekday))
+        weekday = self.config['WEEKDAY']
+        weekday = self.FRENCH_DAYS.get(weekday, weekday)
+        if cal:
+            weekday = getattr(cal, weekday[:3])
+        else:
+            weekday = getattr(calendar, weekday)
         return weekday
 
     def get_time(self):
@@ -112,6 +126,7 @@ class Japanese(BotPlugin):
                     hours = int(round(delta.seconds / 3600.))
                     minutes_text = ''
                     if hours < 5:
+                        hours = int(delta.seconds / 3600)
                         minutes = int(round((delta.seconds % 3600) / 60.))
                         if minutes > 4:
                             minutes_text = ' et {} minutes'.format(minutes)
@@ -142,5 +157,5 @@ class Japanese(BotPlugin):
 
     @botcmd(split_args_with=None)
     def jap(self, message, args):
-
         return self.japanese()
+
